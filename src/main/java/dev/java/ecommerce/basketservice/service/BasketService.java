@@ -2,6 +2,7 @@ package dev.java.ecommerce.basketservice.service;
 
 import dev.java.ecommerce.basketservice.client.response.PlatziProductResponse;
 import dev.java.ecommerce.basketservice.controller.request.BasketRequest;
+import dev.java.ecommerce.basketservice.controller.request.PaymentRequest;
 import dev.java.ecommerce.basketservice.entity.Basket;
 import dev.java.ecommerce.basketservice.entity.Product;
 import dev.java.ecommerce.basketservice.entity.Status;
@@ -23,7 +24,7 @@ public class BasketService {
 
         basketRepository.findByClientIdAndStatus(basketRequest.clientId(), Status.OPEN)
                 .ifPresent(basket -> {
-                    basket.setStatus(Status.CLOSED);
+                    basket.setStatus(Status.SOLD);
                     basketRepository.save(basket);
                 });
 
@@ -53,5 +54,33 @@ public class BasketService {
     public Basket getBasketById(String id) {
         return basketRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Carrinho não encontrado"));
+    }
+
+    public Basket updateBasket(String basketId, BasketRequest request) {
+        Basket savedBasket = getBasketById(basketId);
+
+        List<Product> products = new ArrayList<>();
+        request.products().forEach(productRequest -> {
+            PlatziProductResponse platziProductResponse = productService.getProductById(productRequest.id());
+            products.add(Product.builder()
+                            .id((platziProductResponse.id()))
+                            .title(platziProductResponse.title())
+                            .price(platziProductResponse.price())
+                            .quantity(productRequest.quantity())
+                            .build());
+        });
+
+        savedBasket.setProducts(products);
+
+        savedBasket.calculateTotalPrice();
+        return basketRepository.save(savedBasket);
+
+    }
+
+    public Basket payBasket(String basketId, PaymentRequest request) {
+        Basket savedBasket = getBasketById(basketId);
+        savedBasket.setPaymentMethod(request.getPaymentMethod());
+        savedBasket.setStatus(Status.SOLD);
+        return basketRepository.save(savedBasket);
     }
 }
